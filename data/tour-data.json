@@ -1,0 +1,46 @@
+{
+  "name": "Laboratório Alia",
+  "description": "Ambiente cadastrado pelo usuário.",
+  "startSceneId": "ambiente-1789990440454",
+  "scenes": [
+    {
+      "id": "ambiente-1789990440454",
+      "name": "Laboratório Alia",
+      "startImageId": "img-1789990489736",
+      "images": [
+        {
+          "id": "img-1789990489736",
+          "name": "Estante Motores",
+          "src": "images/01-estante-motores.jpg",
+          "anchors": [
+            {
+              "targetImageId": "img-1789990543038",
+              "position": [
+                -2.1983447958622433,
+                -0.7674863650407965,
+                -2.867266110896273
+              ],
+              "scale": 0.6
+            }
+          ]
+        },
+        {
+          "id": "img-1789990543038",
+          "name": "Braço 2",
+          "src": "images/02-braco-2.jpg",
+          "anchors": [
+            {
+              "targetImageId": "img-1789990489736",
+              "position": [
+                -2.4803679085641925,
+                -0.7569865540402276,
+                0.6085054140357132
+              ],
+              "scale": 0.6
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
