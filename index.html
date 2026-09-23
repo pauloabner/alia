@@ -68,7 +68,9 @@
 
         window.addEventListener('click', (event) => {
           if (event.target !== document.querySelector('canvas')) return;
-          const camera = document.querySelector('[camera]');
+          const cameraEntity = document.querySelector('[camera]');
+          const camera = cameraEntity?.components.camera?.camera;
+          if (!camera) return;
           const raycaster = new THREE.Raycaster();
           const mouse = new THREE.Vector2(
             (event.clientX / window.innerWidth) * 2 - 1,
