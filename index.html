@@ -26,6 +26,7 @@
       <a-entity id="rig" position="0 0 0">
         <a-entity camera look-controls position="0 1.60 0">
           <a-cursor rayOrigin="mouse" fuse="false" raycaster="objects: .hotspot" material="color: #7dd3fc; shader: flat"></a-cursor>
+          <a-ring id="vr-loading" visible="false" position="0 0 -2" radius-inner="0.18" radius-outer="0.24" material="color: #7dd3fc; shader: flat; side: double" animation="property: rotation; to: 0 0 360; loop: true; dur: 800; easing: linear"></a-ring>
         </a-entity>
         <a-entity laser-controls="hand: left" raycaster="objects: .hotspot; far: 30"></a-entity>
         <a-entity laser-controls="hand: right" raycaster="objects: .hotspot; far: 30"></a-entity>
@@ -37,6 +38,8 @@
         const sky = document.querySelector('#panorama');
         const hotspots = document.querySelector('#hotspots');
         const loading = document.querySelector('#loading');
+        const vrLoading = document.querySelector('#vr-loading');
+        const cursor = document.querySelector('a-cursor');
         const images = new Map();
         data.scenes.forEach((scene) => scene.images.forEach((image) => images.set(image.id, image)));
 
@@ -49,6 +52,7 @@
             if (!target) return;
             const marker = document.createElement('a-entity');
             marker.classList.add('hotspot');
+            marker.setAttribute('visible', 'false');
             marker.setAttribute('position', (anchor.position || [0, 0, -2]).join(' '));
             const scale = Number(anchor.scale) || 1;
             marker.setAttribute('scale', scale + ' ' + scale + ' ' + scale);
@@ -91,10 +95,15 @@
           hotspots.innerHTML = '';
           loading.classList.remove('is-ready');
           document.body.classList.add('is-loading');
+          vrLoading.setAttribute('visible', 'true');
+          cursor.setAttribute('visible', 'false');
+          renderHotspots(scene, image);
           await waitForTexture(image.src);
           if (currentTransitionId !== transitionId) return;
-          renderHotspots(scene, image);
+          Array.from(hotspots.children).forEach((marker) => marker.setAttribute('visible', 'true'));
           document.body.classList.remove('is-loading');
+          vrLoading.setAttribute('visible', 'false');
+          cursor.setAttribute('visible', 'true');
           loading.classList.add('is-ready');
         }
 
