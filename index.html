@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>VALIA VR Tour</title>
+    <title>ALIA VR Tour</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <style>
       html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #050914; }
@@ -13,18 +13,48 @@
       @keyframes spin { to { transform: rotate(360deg); } }
       #loading.is-ready { display: none; }
       body.is-loading canvas { cursor: wait; }
+      #navigation-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 24px; background: rgba(2, 6, 23, 0.76); backdrop-filter: blur(8px); }
+      #navigation-modal.is-hidden { display: none; }
+      .navigation-modal-card { width: min(520px, 100%); padding: 28px; color: #e2e8f0; background: linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(8, 47, 73, 0.96)); border: 1px solid rgba(125, 211, 252, 0.35); border-radius: 18px; box-shadow: 0 24px 70px rgba(2, 6, 23, 0.55); font: 16px system-ui, sans-serif; }
+      .navigation-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+      .navigation-modal-header .brand { margin-bottom: 8px; color: #7dd3fc; font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; }
+      .navigation-modal-header h2 { margin: 0; font-size: clamp(1.45rem, 4vw, 2rem); line-height: 1.1; }
+      .modal-close-button { width: 36px; height: 36px; flex: 0 0 auto; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 50%; background: rgba(15, 23, 42, 0.55); color: #e2e8f0; font-size: 1.5rem; line-height: 1; cursor: pointer; }
+      .navigation-guide { display: grid; gap: 14px; margin: 24px 0; }
+      .navigation-guide-item { display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 12px; }
+      .navigation-guide-icon { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(125, 211, 252, 0.5); border-radius: 50%; color: #7dd3fc; font-weight: 700; }
+      .navigation-guide-item div { display: grid; gap: 2px; }
+      .navigation-guide-item strong { color: #f8fafc; }
+      .navigation-guide-item span:last-child { color: #cbd5e1; font-size: 0.9rem; }
+      .navigation-start-button { width: 100%; padding: 12px; border: 1px solid rgba(125, 211, 252, 0.55); border-radius: 999px; background: rgba(14, 165, 233, 0.36); color: #e0f2fe; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+      @media (max-width: 640px) { #navigation-modal { padding: 16px; } .navigation-modal-card { padding: 22px; } }
       .hotspot { cursor: pointer; }
       .hotspot-label { color: #082f49; font: bold 0.3px system-ui, sans-serif; text-align: center; }
     </style>
   </head>
   <body>
     <div id="loading"><div class="loader-content"><div class="loader-icon" aria-hidden="true"></div><span>Carregando tour...</span></div></div>
+    <div id="navigation-modal" role="dialog" aria-modal="true" aria-labelledby="navigation-modal-title">
+      <div class="navigation-modal-card">
+        <div class="navigation-modal-header">
+          <div><div class="brand">ALIA VR</div><h2 id="navigation-modal-title">Como navegar</h2></div>
+          <button type="button" id="close-navigation-modal" class="modal-close-button" aria-label="Fechar instruções">&times;</button>
+        </div>
+        <div class="navigation-guide">
+          <div class="navigation-guide-item"><span class="navigation-guide-icon" aria-hidden="true">↔</span><div><strong>Olhe ao redor</strong><span>Arraste a imagem com o mouse para explorar o ambiente.</span></div></div>
+          <div class="navigation-guide-item"><span class="navigation-guide-icon" aria-hidden="true">↑</span><div><strong>Teletransporte</strong><span>Posicione a mira em uma seta para ir até a próxima imagem.</span></div></div>
+          <div class="navigation-guide-item"><span class="navigation-guide-icon" aria-hidden="true">VR</span><div><strong>Modo VR</strong><span>Use um Meta Quest para entrar na experiência imersiva.</span></div></div>
+        </div>
+        <button type="button" id="start-navigation" class="navigation-start-button">Começar a explorar</button>
+      </div>
+    </div>
     <a-scene background="color: #050914" renderer="colorManagement: true" vr-mode-ui="enabled: true">
       <a-assets id="assets"></a-assets>
+      <canvas id="teleport-icon" width="512" height="512"></canvas>
       <a-sky id="panorama" radius="5" position="0 2.0 0"></a-sky>
       <a-entity id="hotspots"></a-entity>
       <a-entity id="rig" position="0 0 0">
-        <a-entity camera look-controls position="0 1.60 0">
+        <a-entity id="viewer-camera" camera look-controls position="0 1.60 0">
           <a-cursor rayOrigin="mouse" fuse="false" raycaster="objects: .hotspot" material="color: #7dd3fc; shader: flat"></a-cursor>
           <a-ring id="vr-loading" visible="false" position="0 0 -2" radius-inner="0.18" radius-outer="0.24" material="color: #7dd3fc; shader: flat; side: double" animation="property: rotation; to: 0 0 360; loop: true; dur: 800; easing: linear"></a-ring>
         </a-entity>
@@ -40,8 +70,80 @@
         const loading = document.querySelector('#loading');
         const vrLoading = document.querySelector('#vr-loading');
         const cursor = document.querySelector('a-cursor');
+        const navigationModal = document.querySelector('#navigation-modal');
+        const closeNavigationModal = () => {
+          navigationModal.classList.add('is-hidden');
+          window.sessionStorage.setItem('valia-navigation-guide-seen', 'true');
+        };
+        if (window.sessionStorage.getItem('valia-navigation-guide-seen') === 'true') {
+          navigationModal.classList.add('is-hidden');
+        } else {
+          document.querySelector('#close-navigation-modal').addEventListener('click', closeNavigationModal);
+          document.querySelector('#start-navigation').addEventListener('click', closeNavigationModal);
+          navigationModal.addEventListener('click', (event) => {
+            if (event.target === navigationModal) closeNavigationModal();
+          });
+        }
+        const teleportIcon = document.querySelector('#teleport-icon');
         const images = new Map();
+        const imagePreloads = new Map();
+        const cameraPosition = new THREE.Vector3();
+        const markerPosition = new THREE.Vector3();
+
+        AFRAME.registerComponent('teleport-billboard', {
+          tick() {
+            const cameraObject = document.querySelector('#viewer-camera')?.object3D;
+            if (!cameraObject || !this.el.object3D) return;
+            cameraObject.getWorldPosition(cameraPosition);
+            this.el.object3D.getWorldPosition(markerPosition);
+            cameraPosition.y = markerPosition.y;
+            this.el.object3D.lookAt(cameraPosition);
+            this.el.object3D.rotateY(Math.PI);
+          },
+        });
+
         data.scenes.forEach((scene) => scene.images.forEach((image) => images.set(image.id, image)));
+
+        function drawTeleportIcon() {
+          const context = teleportIcon.getContext('2d');
+          context.clearRect(0, 0, 512, 512);
+          context.beginPath();
+          context.lineWidth = 28;
+          context.strokeStyle = '#7dd3fc';
+          context.arc(256, 256, 160, 0, Math.PI * 2);
+          context.stroke();
+          context.beginPath();
+          context.lineWidth = 24;
+          context.strokeStyle = '#e0f2fe';
+          context.arc(256, 256, 92, 0, Math.PI * 2);
+          context.stroke();
+          context.beginPath();
+          context.moveTo(256, 360);
+          context.lineTo(256, 172);
+          context.moveTo(205, 224);
+          context.lineTo(256, 172);
+          context.lineTo(307, 224);
+          context.strokeStyle = '#0f172a';
+          context.lineWidth = 30;
+          context.lineCap = 'round';
+          context.lineJoin = 'round';
+          context.stroke();
+        }
+
+        drawTeleportIcon();
+
+        function preloadImage(src) {
+          if (!src) return Promise.resolve();
+          if (!imagePreloads.has(src)) {
+            imagePreloads.set(src, new Promise((resolve) => {
+              const image = new Image();
+              image.onload = resolve;
+              image.onerror = resolve;
+              image.src = src;
+            }));
+          }
+          return imagePreloads.get(src);
+        }
 
         function currentScene() { return data.scenes.find((scene) => scene.id === data.startSceneId) || data.scenes[0]; }
         let transitionId = 0;
@@ -59,8 +161,9 @@
             const markerVisual = document.createElement('a-entity');
             markerVisual.classList.add('hotspot');
             markerVisual.setAttribute('position', '0 0.6 0');
-            markerVisual.setAttribute('geometry', 'primitive: sphere; radius: 0.28');
-            markerVisual.setAttribute('material', 'color: #7dd3fc; emissive: #0369a1; emissiveIntensity: 0.8; opacity: 0.95');
+            markerVisual.setAttribute('geometry', 'primitive: plane; width: 0.7; height: 0.7');
+            markerVisual.setAttribute('teleport-billboard', '');
+            markerVisual.setAttribute('material', 'shader: flat; src: #teleport-icon; transparent: true; side: double');
             marker.appendChild(markerVisual);
             const navigate = () => showImage(scene, target.id);
             marker.addEventListener('click', navigate);
@@ -69,6 +172,7 @@
               navigate();
             });
             hotspots.appendChild(marker);
+            preloadImage(target.src);
           });
         }
 
@@ -82,7 +186,7 @@
               window.clearTimeout(timeoutId);
               resolve();
             };
-            const timeoutId = window.setTimeout(finish, 10000);
+            const timeoutId = window.setTimeout(finish, 1500);
             sky.addEventListener('materialtextureloaded', finish, { once: true });
             sky.setAttribute('src', src);
           });
@@ -98,6 +202,7 @@
           vrLoading.setAttribute('visible', 'true');
           cursor.setAttribute('visible', 'false');
           renderHotspots(scene, image);
+          await preloadImage(image.src);
           await waitForTexture(image.src);
           if (currentTransitionId !== transitionId) return;
           Array.from(hotspots.children).forEach((marker) => marker.setAttribute('visible', 'true'));
@@ -125,6 +230,7 @@
 
         const scene = currentScene();
         if (!scene) { loading.textContent = 'Nenhum ambiente disponível.'; return; }
+        preloadImage(scene.images?.find((image) => image.id === scene.startImageId)?.src || scene.images?.[0]?.src);
         showImage(scene, scene.startImageId || scene.images[0]?.id);
         loading.classList.add('is-ready');
       }());
