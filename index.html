@@ -42,20 +42,20 @@
         </div>
         <div class="navigation-guide">
           <div class="navigation-guide-item"><span class="navigation-guide-icon" aria-hidden="true">↔</span><div><strong>Olhe ao redor</strong><span>Arraste a imagem com o mouse para explorar o ambiente.</span></div></div>
-          <div class="navigation-guide-item"><span class="navigation-guide-icon" aria-hidden="true">↑</span><div><strong>Teletransporte</strong><span>Posicione a mira em uma seta para ir até a próxima imagem.</span></div></div>
+          <div class="navigation-guide-item"><span class="navigation-guide-icon" aria-hidden="true">↑</span><div><strong>Teletransporte</strong><span>No desktop, dê duplo clique em uma seta. No modo VR, aponte  a mira para ela e selecione.</span></div></div>
           <div class="navigation-guide-item"><span class="navigation-guide-icon" aria-hidden="true">VR</span><div><strong>Modo VR</strong><span>Use um Meta Quest para entrar na experiência imersiva.</span></div></div>
         </div>
         <button type="button" id="start-navigation" class="navigation-start-button">Começar a explorar</button>
       </div>
     </div>
-    <a-scene background="color: #050914" renderer="colorManagement: true" vr-mode-ui="enabled: true">
+    <a-scene id="tour-scene" background="color: #050914" renderer="colorManagement: true" vr-mode-ui="enabled: true">
       <a-assets id="assets"></a-assets>
       <canvas id="teleport-icon" width="512" height="512"></canvas>
       <a-sky id="panorama" radius="5" position="0 2.0 0"></a-sky>
       <a-entity id="hotspots"></a-entity>
       <a-entity id="rig" position="0 0 0">
         <a-entity id="viewer-camera" camera look-controls position="0 1.60 0">
-          <a-cursor rayOrigin="mouse" fuse="false" raycaster="objects: .hotspot" material="color: #7dd3fc; shader: flat"></a-cursor>
+          <a-cursor visible="false" rayOrigin="mouse" fuse="false" raycaster="objects: .hotspot" material="color: #7dd3fc; shader: flat"></a-cursor>
           <a-ring id="vr-loading" visible="false" position="0 0 -1.5" theta-length="270" radius-inner="0.08" radius-outer="0.12" material="color: #7dd3fc; shader: flat; side: double" animation="property: rotation; to: 0 0 360; loop: true; dur: 800; easing: linear"></a-ring>
         </a-entity>
         <a-entity laser-controls="hand: left" raycaster="objects: .hotspot; far: 30"></a-entity>
@@ -67,9 +67,12 @@
         const data = await fetch('./data/tour-data.json').then((response) => response.json());
         const sky = document.querySelector('#panorama');
         const hotspots = document.querySelector('#hotspots');
+        const tourScene = document.querySelector('#tour-scene');
         const loading = document.querySelector('#loading');
         const vrLoading = document.querySelector('#vr-loading');
         const cursor = document.querySelector('a-cursor');
+        tourScene.addEventListener('enter-vr', () => cursor.setAttribute('visible', 'true'));
+        tourScene.addEventListener('exit-vr', () => cursor.setAttribute('visible', 'false'));
         const navigationModal = document.querySelector('#navigation-modal');
         const closeNavigationModal = () => {
           navigationModal.classList.add('is-hidden');
@@ -166,10 +169,10 @@
             markerVisual.setAttribute('material', 'shader: flat; src: #teleport-icon; transparent: true; side: double');
             marker.appendChild(markerVisual);
             const navigate = () => showImage(scene, target.id);
-            marker.addEventListener('click', navigate);
-            markerVisual.addEventListener('mousedown', (event) => {
-              event.stopPropagation();
-              navigate();
+            marker.__navigate = navigate;
+            markerVisual.__navigate = navigate;
+            marker.addEventListener('click', () => {
+              if (tourScene.is('vr-mode')) navigate();
             });
             hotspots.appendChild(marker);
             preloadImage(target.src);
@@ -208,12 +211,12 @@
           Array.from(hotspots.children).forEach((marker) => marker.setAttribute('visible', 'true'));
           document.body.classList.remove('is-loading');
           vrLoading.setAttribute('visible', 'false');
-          cursor.setAttribute('visible', 'true');
+          cursor.setAttribute('visible', tourScene.is('vr-mode') ? 'true' : 'false');
           loading.classList.add('is-ready');
         }
 
-        window.addEventListener('click', (event) => {
-          if (event.target !== document.querySelector('canvas')) return;
+        window.addEventListener('dblclick', (event) => {
+          if (tourScene.is('vr-mode') || event.target !== tourScene.canvas) return;
           const cameraEntity = document.querySelector('[camera]');
           const camera = cameraEntity?.components.camera?.camera;
           if (!camera) return;
@@ -225,7 +228,7 @@
           raycaster.setFromCamera(mouse, camera);
           const intersections = raycaster.intersectObjects(hotspots.object3D.children, true);
           const target = intersections[0]?.object?.el?.closest('.hotspot');
-          target?.click();
+          target?.__navigate?.();
         });
 
         const scene = currentScene();
